@@ -43,7 +43,7 @@ static instantModel* getModel(VALUE self) {
 }
 
 static void wrap_model_free(instantModel* p) {
-    delete p->model;
+    // delete &(p->model); TODO いらない?
     ruby_xfree(p);
 }
 
@@ -52,8 +52,8 @@ static VALUE wrap_model_alloc(VALUE klass) {
     return Data_Wrap_Struct(klass, NULL, wrap_model_free, p);
 }
 
-static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE vbatch_size, VALUE vchannel_num,
-                             VALUE vheight, VALUE vwidth) {
+static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE vbatch_size,
+                             VALUE vchannel_num, VALUE vheight, VALUE vwidth) {
 
     constexpr auto batch_size = 1;
     constexpr auto channel_num = 3;
@@ -66,18 +66,23 @@ static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE vbatch_size, VALUE v
 
     std::vector<int> input_dims{batch_size, channel_num, height, width};
 
+    VALUE vconv1_1_in_name = rb_str_new2("140326425860192");
+    VALUE vfc6_out_name = rb_str_new2("140326200777976");
+    VALUE vsoftmax_out_name = rb_str_new2("140326200803680");
+
     auto conv1_1_in_name = "140326425860192";
     auto fc6_out_name = "140326200777976";
     auto softmax_out_name = "140326200803680";
 
     getModel(self)->model = NULL;
     // TODO getModel(self)->modelにmake_modelの結果を代入する
-    instant::make_model(
+    auto model = instant::make_model(
       *(getONNX(vonnx)->onnx),
-      {std::make_tuple(conv1_1_in_name, instant::dtype_t::float_, input_dims,
+      {std::make_tuple(StringValuePtr(vconv1_1_in_name),
+                       instant::dtype_t::float_, input_dims,
                        mkldnn::memory::format::nchw)},
-      {fc6_out_name, softmax_out_name});
-
+      {StringValuePtr(vfc6_out_name), StringValuePtr(vsoftmax_out_name)});
+    getModel(self)->model = &model;
     return Qnil;
 }
 
@@ -86,7 +91,7 @@ static VALUE wrap_onnx_makeModel(VALUE self, VALUE vbatch_size,
                                  VALUE vwidth) {
 
     VALUE klass = rb_const_get(rb_cObject, rb_intern("ONNXModel"));
-    VALUE obj = rb_class_new_instance(0, NULL, klass);
+    VALUE obj = rb_class_new_instance(1, {&self}, klass);
 
     return obj;
 }
