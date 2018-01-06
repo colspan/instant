@@ -117,12 +117,12 @@ int main(int argc, char** argv) {
       {fc6_out_name, softmax_out_name}); // required output's name list
 
     // Copy input image data to model's input array
-    auto& input_array = model.input(conv1_1_in_name);
+    auto& input_array = model->input(conv1_1_in_name);
     std::copy(image_data.begin(), image_data.end(),
               instant::fbegin(input_array));
 
     // Run inference
-    auto const& output_table = model.run();
+    auto const& output_table = model->run();
 
     // Get output
     auto const& fc6_out_arr = instant::find_value(output_table, fc6_out_name);
