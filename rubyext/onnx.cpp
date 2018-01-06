@@ -15,6 +15,7 @@ static instantONNX* getONNX(VALUE self) {
 }
 
 static void wrap_onnx_free(instantONNX* p) {
+    std::cout << "DEBUG ONNX free" << std::endl;
     p->onnx->~ModelProto();
     ruby_xfree(p);
 }
@@ -34,6 +35,10 @@ static VALUE wrap_onnx_init(VALUE self, VALUE vfilename) {
 
 struct instantModel {
     instant::model* model;
+    std::vector<std::tuple<std::string, instant::dtype_t,
+                           std::vector<int> const&, mkldnn::memory::format>>
+      input_def;
+    std::vector<std::string> output_def;
 };
 
 static instantModel* getModel(VALUE self) {
@@ -43,7 +48,8 @@ static instantModel* getModel(VALUE self) {
 }
 
 static void wrap_model_free(instantModel* p) {
-    // delete &(p->model); TODO いらない?
+    // delete &(p->model); 不要?
+    std::cout << "DEBUG ONNXModel free" << std::endl;
     ruby_xfree(p);
 }
 
@@ -55,34 +61,26 @@ static VALUE wrap_model_alloc(VALUE klass) {
 static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE vbatch_size,
                              VALUE vchannel_num, VALUE vheight, VALUE vwidth) {
 
-    constexpr auto batch_size = 1;
-    constexpr auto channel_num = 3;
-    constexpr auto height = 224;
-    constexpr auto width = 224;
-    // int batch_size = NUM2INT(vbatch_size);
-    // int channel_num = NUM2INT(vchannel_num);
-    // int height = NUM2INT(vheight);
-    // int width = NUM2INT(vwidth);
+    int batch_size = NUM2INT(vbatch_size);
+    int channel_num = NUM2INT(vchannel_num);
+    int height = NUM2INT(vheight);
+    int width = NUM2INT(vwidth);
 
     std::vector<int> input_dims{batch_size, channel_num, height, width};
 
+    // TODO 外部から入力を受けるようにする
     VALUE vconv1_1_in_name = rb_str_new2("140326425860192");
     VALUE vfc6_out_name = rb_str_new2("140326200777976");
     VALUE vsoftmax_out_name = rb_str_new2("140326200803680");
 
-    auto conv1_1_in_name = "140326425860192";
-    auto fc6_out_name = "140326200777976";
-    auto softmax_out_name = "140326200803680";
-
-    getModel(self)->model = NULL;
-    // TODO getModel(self)->modelにmake_modelの結果を代入する
     auto model = instant::make_model(
       *(getONNX(vonnx)->onnx),
       {std::make_tuple(StringValuePtr(vconv1_1_in_name),
                        instant::dtype_t::float_, input_dims,
                        mkldnn::memory::format::nchw)},
       {StringValuePtr(vfc6_out_name), StringValuePtr(vsoftmax_out_name)});
-    getModel(self)->model = &model;
+    getModel(self)->model = model;
+
     return Qnil;
 }
 
@@ -90,10 +88,42 @@ static VALUE wrap_onnx_makeModel(VALUE self, VALUE vbatch_size,
                                  VALUE vchannel_num, VALUE vheight,
                                  VALUE vwidth) {
 
+    VALUE args[] = {self, vbatch_size, vchannel_num, vheight, vwidth};
     VALUE klass = rb_const_get(rb_cObject, rb_intern("ONNXModel"));
-    VALUE obj = rb_class_new_instance(1, {&self}, klass);
+    VALUE obj = rb_class_new_instance(5, args, klass);
 
     return obj;
+}
+
+static VALUE wrap_model_inference(VALUE self, VALUE image) {
+    VALUE vconv1_1_in_name = rb_str_new2("140326425860192");
+
+    // std::vector<float> image_data(mat.channels() * mat.rows * mat.cols);
+    std::cout << "DEBUG test 1 " << std::endl;
+    // Copy input image data to model's input array
+    auto& input_array = getModel(self)->model->input("140326425860192");
+    std::cout << "DEBUG test 2 " << std::endl;
+
+    // std::copy(image_data.begin(), image_data.end(),
+    // instant::fbegin(input_array));
+
+    // Run inference
+    auto const& output_table = getModel(self)->model->run();
+    std::cout << "DEBUG test 3 " << std::endl;
+
+    // TODO
+    // Get output
+    auto const& fc6_out_arr =
+      instant::find_value(output_table, "140326200777976");
+    std::cout << "fc6_out: ";
+    for(int i = 0; i < 5; ++i) {
+        std::cout << instant::fat(fc6_out_arr, i) << " ";
+    }
+    std::cout << "...\n";
+
+    auto const& softmax_out_arr =
+      instant::find_value(output_table, "140326200803680");
+
 }
 
 /**
@@ -112,5 +142,8 @@ extern "C" void Init_instant() {
 
     rb_define_alloc_func(model, wrap_model_alloc);
     rb_define_private_method(model, "initialize",
-                             RUBY_METHOD_FUNC(wrap_model_init), 1);
+                             RUBY_METHOD_FUNC(wrap_model_init), 5);
+
+    rb_define_method(model, "inference", RUBY_METHOD_FUNC(wrap_model_inference),
+                     1);
 }

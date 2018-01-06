@@ -7,4 +7,4 @@ height = 224;
 width = 224;
 
 a = onnx_obj.make_model(batch_size, channel_num, height, width)
-p a
+a.inference("test")
