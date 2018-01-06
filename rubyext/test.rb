@@ -18,9 +18,9 @@ model = onnx_obj.make_model(batch_size, channel_num, height, width)
 # 推論対象の画像を読み込む
 image = Image.read("../data/Light_sussex_hen.jpg").first
 image = image.resize_to_fill(width, height)
-
-# p image.export_pixels.map { |pix| pix/257 }.each_slice(3).each_slice(image.columns).to_a
 imageset = [image]
+
+# 推論を実行
 inference_result = model.inference(imageset)
 
 # カテゴリ定義を読み込む

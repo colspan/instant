@@ -126,34 +126,21 @@ static VALUE wrap_model_inference(VALUE self, VALUE images) {
             }
         }
     }
-    // std::cout << "DEBUG test 1 " << std::endl;
     // Copy input image data to model's input array
     auto& input_array = getModel(self)->model->input("140326425860192");
-    // std::cout << "DEBUG test 2 " << std::endl;
 
     std::copy(image_data.begin(), image_data.end(),
               instant::fbegin(input_array));
 
     // Run inference
     auto const& output_table = getModel(self)->model->run();
-    // std::cout << "DEBUG test 3 " << std::endl;
 
-    // TODO
     // Get output
     auto const& fc6_out_arr =
       instant::find_value(output_table, "140326200777976");
-    // std::cout << "fc6_out: ";
-    // for(int i = 0; i < 5; ++i) {
-    //     std::cout << instant::fat(fc6_out_arr, i) << " ";
-    // }
-    // std::cout << "...\n";
 
     auto const& softmax_out_arr =
       instant::find_value(output_table, "140326200803680");
-    // std::cout << "softmax_out: ";
-    // for(int i = 0; i < 5; ++i) {
-    //     std::cout << instant::fat(fc6_out_arr, i) << " ";
-    // }
     // 配列に積んで返す
     VALUE result_array = rb_ary_new();
     for(int i = 0; i < instant::total_size(softmax_out_arr); ++i) {
