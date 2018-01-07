@@ -15,7 +15,6 @@ static instantONNX* getONNX(VALUE self) {
 }
 
 static void wrap_onnx_free(instantONNX* p) {
-    std::cout << "DEBUG ONNX free" << std::endl;
     p->onnx->~ModelProto();
     ruby_xfree(p);
 }
@@ -50,10 +49,9 @@ static instantModel* getModel(VALUE self) {
 }
 
 static void wrap_model_free(instantModel* p) {
-    // delete &(p->model); 不要?
+    // delete &(p->model); needless?
     delete p->input_layer;
     delete p->output_layers;
-    std::cout << "DEBUG ONNXModel free" << std::endl;
     ruby_xfree(p);
 }
 
@@ -64,7 +62,7 @@ static VALUE wrap_model_alloc(VALUE klass) {
 
 static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE condition) {
 
-    // TODO 型チェックを行う
+    // TODO check data type
 
     // input data conditions
     int batch_size = getModel(self)->batch_size =
@@ -121,7 +119,7 @@ static VALUE wrap_model_inference(VALUE self, VALUE images) {
     std::vector<float> image_data(getModel(self)->channel_num *
                                   getModel(self)->width *
                                   getModel(self)->height);
-    // RMagick の形式を変換する
+    // Convert RMagick format to instant format
     for(int i; i < image_num; i++) {
         VALUE image = rb_ary_entry(images, 0);
         VALUE raw_values =
@@ -159,7 +157,7 @@ static VALUE wrap_model_inference(VALUE self, VALUE images) {
     for(auto output_layer : *(getModel(self)->output_layers)) {
         auto const& softmax_out_arr =
           instant::find_value(output_table, output_layer);
-        // 配列に積んで返す
+        // Convert result to Ruby Array
         VALUE result_array = rb_ary_new();
         for(int i = 0; i < instant::total_size(softmax_out_arr); ++i) {
             rb_ary_push(result_array,
@@ -173,7 +171,7 @@ static VALUE wrap_model_inference(VALUE self, VALUE images) {
 }
 
 /**
- * require時に呼び出し
+ * will be called when required
  */
 extern "C" void Init_instant() {
     VALUE onnx = rb_define_class("ONNX", rb_cObject);
