@@ -4,7 +4,7 @@ include Magick
 require './instant'
 
 # load ONNX file
-onnx_obj = ONNX.new("../data/VGG16.onnx")
+onnx_obj = Instant.new("../data/VGG16.onnx")
 
 CONV1_1_IN_NAME = "140326425860192"
 FC6_OUT_NAME = "140326200777976"

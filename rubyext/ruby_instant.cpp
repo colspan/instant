@@ -14,17 +14,17 @@ static instantONNX* getONNX(VALUE self) {
     return p;
 }
 
-static void wrap_onnx_free(instantONNX* p) {
+static void wrap_instant_free(instantONNX* p) {
     p->onnx->~ModelProto();
     ruby_xfree(p);
 }
 
-static VALUE wrap_onnx_alloc(VALUE klass) {
+static VALUE wrap_instant_alloc(VALUE klass) {
     void* p = ruby_xmalloc(sizeof(instantONNX));
-    return Data_Wrap_Struct(klass, NULL, wrap_onnx_free, p);
+    return Data_Wrap_Struct(klass, NULL, wrap_instant_free, p);
 }
 
-static VALUE wrap_onnx_init(VALUE self, VALUE vfilename) {
+static VALUE wrap_instant_init(VALUE self, VALUE vfilename) {
     char* filename = StringValuePtr(vfilename);
     // Load ONNX model
     getONNX(self)->onnx = new onnx::ModelProto(instant::load_onnx(filename));
@@ -108,10 +108,10 @@ static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE condition) {
     return Qnil;
 }
 
-static VALUE wrap_onnx_makeModel(VALUE self, VALUE condition) {
+static VALUE wrap_instant_makeModel(VALUE self, VALUE condition) {
 
     VALUE args[] = {self, condition};
-    VALUE klass = rb_const_get(rb_cObject, rb_intern("ONNXModel"));
+    VALUE klass = rb_const_get(rb_cObject, rb_intern("InstantModel"));
     VALUE obj = rb_class_new_instance(2, args, klass);
 
     return obj;
@@ -192,15 +192,15 @@ static VALUE wrap_model_inference(VALUE self, VALUE images) {
  * will be called when required
  */
 extern "C" void Init_instant() {
-    VALUE onnx = rb_define_class("ONNX", rb_cObject);
+    VALUE onnx = rb_define_class("Instant", rb_cObject);
 
-    rb_define_alloc_func(onnx, wrap_onnx_alloc);
+    rb_define_alloc_func(onnx, wrap_instant_alloc);
     rb_define_private_method(onnx, "initialize",
-                             RUBY_METHOD_FUNC(wrap_onnx_init), 1);
-    rb_define_method(onnx, "make_model", RUBY_METHOD_FUNC(wrap_onnx_makeModel),
-                     1);
+                             RUBY_METHOD_FUNC(wrap_instant_init), 1);
+    rb_define_method(onnx, "make_model",
+                     RUBY_METHOD_FUNC(wrap_instant_makeModel), 1);
 
-    VALUE model = rb_define_class("ONNXModel", rb_cObject);
+    VALUE model = rb_define_class("InstantModel", rb_cObject);
 
     rb_define_alloc_func(model, wrap_model_alloc);
     rb_define_private_method(model, "initialize",
