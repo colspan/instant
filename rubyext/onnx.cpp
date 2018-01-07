@@ -39,8 +39,8 @@ struct instantModel {
     int channel_num;
     int width;
     int height;
-    char* input_layer;
-    std::string output_layers;
+    std::string* input_layer;
+    std::string** output_layers;
 };
 
 static instantModel* getModel(VALUE self) {
@@ -65,6 +65,7 @@ static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE condition) {
 
     // TODO 型チェックを行う
 
+    // input data conditions
     int batch_size = getModel(self)->batch_size =
       NUM2INT(rb_hash_aref(condition, rb_to_symbol(rb_str_new2("batch_size"))));
     int channel_num = getModel(self)->channel_num = NUM2INT(
@@ -73,23 +74,21 @@ static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE condition) {
       NUM2INT(rb_hash_aref(condition, rb_to_symbol(rb_str_new2("height"))));
     int width = getModel(self)->width =
       NUM2INT(rb_hash_aref(condition, rb_to_symbol(rb_str_new2("width"))));
+
+    // input_layer
     VALUE vinput_layer =
       rb_hash_aref(condition, rb_to_symbol(rb_str_new2("input_layer")));
-
-    getModel(self)->input_layer =
-      new char[strlen(StringValuePtr(vinput_layer))];
-    strncpy(getModel(self)->input_layer, StringValuePtr(vinput_layer),
-            strlen(StringValuePtr(vinput_layer)));
-
-    std::vector<int> input_dims{batch_size, channel_num, height, width};
+    getModel(self)->input_layer = new std::string(StringValuePtr(vinput_layer));
 
     // TODO 外部から入力を受けるようにする
     VALUE vfc6_out_name = rb_str_new2("140326200777976");
     VALUE vsoftmax_out_name = rb_str_new2("140326200803680");
 
+    std::vector<int> input_dims{batch_size, channel_num, height, width};
+
     auto model = instant::make_model(
       *(getONNX(vonnx)->onnx),
-      {std::make_tuple(getModel(self)->input_layer, instant::dtype_t::float_,
+      {std::make_tuple(*(getModel(self)->input_layer), instant::dtype_t::float_,
                        input_dims, mkldnn::memory::format::nchw)},
       {StringValuePtr(vfc6_out_name), StringValuePtr(vsoftmax_out_name)});
     getModel(self)->model = model;
@@ -138,7 +137,7 @@ static VALUE wrap_model_inference(VALUE self, VALUE images) {
     }
     // Copy input image data to model's input array
     auto& input_array =
-      getModel(self)->model->input(getModel(self)->input_layer);
+      getModel(self)->model->input(*(getModel(self)->input_layer));
 
     std::copy(image_data.begin(), image_data.end(),
               instant::fbegin(input_array));
