@@ -94,16 +94,12 @@ static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE condition) {
 
     std::vector<int> input_dims{batch_size, channel_num, height, width};
 
-    // std::cout << "DEBUG 1" << std::endl;
-
     auto model = instant::make_model(
       *(getONNX(vonnx)->onnx),
       {std::make_tuple(*input_layer, instant::dtype_t::float_, input_dims,
                        mkldnn::memory::format::nchw)},
       *output_layers);
     getModel(self)->model = model;
-
-    // std::cout << "DEBUG 2" << std::endl;
 
     return Qnil;
 }
@@ -121,19 +117,16 @@ static VALUE wrap_model_inference(VALUE self, VALUE images) {
 
     int image_num = NUM2INT(rb_funcall(images, rb_intern("length"), 0, NULL));
 
-    // std::cout << "DEBUG 3" << std::endl;
-
     // Copy input image data to model's input array
     auto& input_array =
       getModel(self)->model->input(*(getModel(self)->input_layer));
 
-    // std::cout << "DEBUG " << instant::total_size(input_array) << std::endl;
     // Convert RMagick format to instant format
     std::vector<float> image_data(
       getModel(self)->batch_size * getModel(self)->channel_num *
       getModel(self)->width * getModel(self)->height);
     for(int i; i < image_num; i++) {
-        VALUE image = rb_ary_entry(images, 0);
+        VALUE image = rb_ary_entry(images, i);
         VALUE raw_values =
           rb_funcall(image, rb_intern("export_pixels"), 0, NULL);
         auto value_num =

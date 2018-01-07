@@ -13,7 +13,9 @@ SOFTMAX_OUT_NAME = "140326200803680"
 # load dataset
 imagelist = [
   "../data/Light_sussex_hen.jpg",
-  #"../data/Light_sussex_hen.jpg"
+  "../data/Light_sussex_hen.jpg",
+  "../data/Light_sussex_hen.jpg",
+  "../data/Light_sussex_hen.jpg",
 ]
 
 # conditions for inference
