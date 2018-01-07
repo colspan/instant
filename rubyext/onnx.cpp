@@ -40,7 +40,7 @@ struct instantModel {
     int width;
     int height;
     std::string* input_layer;
-    std::string** output_layers;
+    std::vector<std::string>* output_layers;
 };
 
 static instantModel* getModel(VALUE self) {
@@ -52,6 +52,7 @@ static instantModel* getModel(VALUE self) {
 static void wrap_model_free(instantModel* p) {
     // delete &(p->model); 不要?
     delete p->input_layer;
+    delete p->output_layers;
     std::cout << "DEBUG ONNXModel free" << std::endl;
     ruby_xfree(p);
 }
@@ -80,9 +81,16 @@ static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE condition) {
       rb_hash_aref(condition, rb_to_symbol(rb_str_new2("input_layer")));
     getModel(self)->input_layer = new std::string(StringValuePtr(vinput_layer));
 
-    // TODO 外部から入力を受けるようにする
-    VALUE vfc6_out_name = rb_str_new2("140326200777976");
-    VALUE vsoftmax_out_name = rb_str_new2("140326200803680");
+    // output_layer
+    std::vector<std::string>* output_layers = new std::vector<std::string>;
+    VALUE voutput_layers =
+      rb_hash_aref(condition, rb_to_symbol(rb_str_new2("output_layers")));
+    int output_layer_num =
+      NUM2INT(rb_funcall(voutput_layers, rb_intern("length"), 0, NULL));
+    for(int i = 0; i < output_layer_num; i++) {
+        VALUE voutput_layer = rb_ary_entry(voutput_layers, i);
+        output_layers->push_back(std::string(StringValuePtr(voutput_layer)));
+    }
 
     std::vector<int> input_dims{batch_size, channel_num, height, width};
 
@@ -90,7 +98,7 @@ static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE condition) {
       *(getONNX(vonnx)->onnx),
       {std::make_tuple(*(getModel(self)->input_layer), instant::dtype_t::float_,
                        input_dims, mkldnn::memory::format::nchw)},
-      {StringValuePtr(vfc6_out_name), StringValuePtr(vsoftmax_out_name)});
+      *output_layers);
     getModel(self)->model = model;
 
     return Qnil;
