@@ -49,7 +49,7 @@ static instantModel* getModel(VALUE self) {
 }
 
 static void wrap_model_free(instantModel* p) {
-    // delete &(p->model); needless?
+    delete p->model;
     delete p->input_layer;
     delete p->output_layers;
     ruby_xfree(p);
