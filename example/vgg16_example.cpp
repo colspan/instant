@@ -71,7 +71,7 @@ auto load_category_list(std::string const& synset_words_path) {
 int main(int argc, char** argv) {
     std::cout << "vgg16 example" << std::endl;
 
-    constexpr auto batch_size = 1;
+    constexpr auto batch_size = 2;
     constexpr auto channel_num = 3;
     constexpr auto height = 224;
     constexpr auto width = 224;

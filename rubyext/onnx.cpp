@@ -77,7 +77,8 @@ static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE condition) {
     // input_layer
     VALUE vinput_layer =
       rb_hash_aref(condition, rb_to_symbol(rb_str_new2("input_layer")));
-    getModel(self)->input_layer = new std::string(StringValuePtr(vinput_layer));
+    std::string* input_layer = new std::string(StringValuePtr(vinput_layer));
+    getModel(self)->input_layer = input_layer;
 
     // output_layer
     std::vector<std::string>* output_layers = new std::vector<std::string>;
@@ -93,12 +94,16 @@ static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE condition) {
 
     std::vector<int> input_dims{batch_size, channel_num, height, width};
 
+    // std::cout << "DEBUG 1" << std::endl;
+
     auto model = instant::make_model(
       *(getONNX(vonnx)->onnx),
-      {std::make_tuple(*(getModel(self)->input_layer), instant::dtype_t::float_,
-                       input_dims, mkldnn::memory::format::nchw)},
+      {std::make_tuple(*input_layer, instant::dtype_t::float_, input_dims,
+                       mkldnn::memory::format::nchw)},
       *output_layers);
     getModel(self)->model = model;
+
+    // std::cout << "DEBUG 2" << std::endl;
 
     return Qnil;
 }
@@ -116,20 +121,30 @@ static VALUE wrap_model_inference(VALUE self, VALUE images) {
 
     int image_num = NUM2INT(rb_funcall(images, rb_intern("length"), 0, NULL));
 
-    std::vector<float> image_data(getModel(self)->channel_num *
-                                  getModel(self)->width *
-                                  getModel(self)->height);
+    // std::cout << "DEBUG 3" << std::endl;
+
+    // Copy input image data to model's input array
+    auto& input_array =
+      getModel(self)->model->input(*(getModel(self)->input_layer));
+
+    // std::cout << "DEBUG " << instant::total_size(input_array) << std::endl;
     // Convert RMagick format to instant format
+    std::vector<float> image_data(
+      getModel(self)->batch_size * getModel(self)->channel_num *
+      getModel(self)->width * getModel(self)->height);
     for(int i; i < image_num; i++) {
         VALUE image = rb_ary_entry(images, 0);
         VALUE raw_values =
           rb_funcall(image, rb_intern("export_pixels"), 0, NULL);
         auto value_num =
           NUM2INT(rb_funcall(raw_values, rb_intern("length"), 0, NULL));
+        int image_offset = i * getModel(self)->channel_num *
+                           getModel(self)->width * getModel(self)->height;
         for(int y = 0; y < getModel(self)->height; ++y) {
             for(int x = 0; x < getModel(self)->width; ++x) {
                 for(int c = 0; c < getModel(self)->channel_num; c++) {
-                    image_data[c * (getModel(self)->width *
+                    image_data[image_offset +
+                               c * (getModel(self)->width *
                                     getModel(self)->height) +
                                y * getModel(self)->width + x] =
                       static_cast<float>(
@@ -142,10 +157,6 @@ static VALUE wrap_model_inference(VALUE self, VALUE images) {
             }
         }
     }
-    // Copy input image data to model's input array
-    auto& input_array =
-      getModel(self)->model->input(*(getModel(self)->input_layer));
-
     std::copy(image_data.begin(), image_data.end(),
               instant::fbegin(input_array));
 
@@ -153,21 +164,28 @@ static VALUE wrap_model_inference(VALUE self, VALUE images) {
     auto const& output_table = getModel(self)->model->run();
 
     // Get output
-    VALUE result = rb_hash_new();
-    for(auto output_layer : *(getModel(self)->output_layers)) {
-        auto const& softmax_out_arr =
-          instant::find_value(output_table, output_layer);
-        // Convert result to Ruby Array
-        VALUE result_array = rb_ary_new();
-        for(int i = 0; i < instant::total_size(softmax_out_arr); ++i) {
-            rb_ary_push(result_array,
-                        DBL2NUM(instant::fat(softmax_out_arr, i)));
-        }
+    VALUE results = rb_ary_new();
+    for(int i = 0; i < getModel(self)->batch_size; i++) {
+        VALUE result_each = rb_hash_new();
+        for(auto output_layer : *(getModel(self)->output_layers)) {
+            auto const& out_arr =
+              instant::find_value(output_table, output_layer);
+            int unit_num =
+              instant::total_size(out_arr) / getModel(self)->batch_size;
+            // Convert result to Ruby Array
+            VALUE result_layer_output = rb_ary_new();
+            for(int j = i * unit_num; j < (i + 1) * unit_num; ++j) {
+                rb_ary_push(result_layer_output,
+                            DBL2NUM(instant::fat(out_arr, j)));
+            }
 
-        rb_hash_aset(result, rb_str_new2(output_layer.c_str()), result_array);
+            rb_hash_aset(result_each, rb_str_new2(output_layer.c_str()),
+                         result_layer_output);
+        }
+        rb_ary_push(results, result_each);
     }
 
-    return result;
+    return results;
 }
 
 /**
