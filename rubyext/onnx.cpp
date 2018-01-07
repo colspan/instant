@@ -91,6 +91,7 @@ static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE condition) {
         VALUE voutput_layer = rb_ary_entry(voutput_layers, i);
         output_layers->push_back(std::string(StringValuePtr(voutput_layer)));
     }
+    getModel(self)->output_layers = output_layers;
 
     std::vector<int> input_dims{batch_size, channel_num, height, width};
 
@@ -154,17 +155,21 @@ static VALUE wrap_model_inference(VALUE self, VALUE images) {
     auto const& output_table = getModel(self)->model->run();
 
     // Get output
-    auto const& fc6_out_arr =
-      instant::find_value(output_table, "140326200777976");
+    VALUE result = rb_hash_new();
+    for(auto output_layer : *(getModel(self)->output_layers)) {
+        auto const& softmax_out_arr =
+          instant::find_value(output_table, output_layer);
+        // 配列に積んで返す
+        VALUE result_array = rb_ary_new();
+        for(int i = 0; i < instant::total_size(softmax_out_arr); ++i) {
+            rb_ary_push(result_array,
+                        DBL2NUM(instant::fat(softmax_out_arr, i)));
+        }
 
-    auto const& softmax_out_arr =
-      instant::find_value(output_table, "140326200803680");
-    // 配列に積んで返す
-    VALUE result_array = rb_ary_new();
-    for(int i = 0; i < instant::total_size(softmax_out_arr); ++i) {
-        rb_ary_push(result_array, DBL2NUM(instant::fat(softmax_out_arr, i)));
+        rb_hash_aset(result, rb_str_new2(output_layer.c_str()), result_array);
     }
-    return result_array;
+
+    return result;
 }
 
 /**

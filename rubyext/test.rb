@@ -35,7 +35,7 @@ inference_result = model.inference(imageset)
 categories = File.read('../data/synset_words.txt').split("\n")
 
 # スコアでソートする
-sorted_result = inference_result.zip(categories).sort_by{|x| -x[0]}
+sorted_result = inference_result[softmax_out_name].zip(categories).sort_by{|x| -x[0]}
 # [softmax_out_name]
 
 # 推論結果を表示する
