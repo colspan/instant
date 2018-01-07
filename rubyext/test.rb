@@ -6,13 +6,14 @@ require './instant'
 # load ONNX file
 onnx_obj = ONNX.new("../data/VGG16.onnx")
 
-conv1_1_in_name = "140326425860192"
-fc6_out_name = "140326200777976"
-softmax_out_name = "140326200803680"
+CONV1_1_IN_NAME = "140326425860192"
+FC6_OUT_NAME = "140326200777976"
+SOFTMAX_OUT_NAME = "140326200803680"
 
 # load dataset
 imagelist = [
-  "../data/Light_sussex_hen.jpg", #"../data/Light_sussex_hen.jpg"
+  "../data/Light_sussex_hen.jpg",
+  #"../data/Light_sussex_hen.jpg"
 ]
 
 # conditions for inference
@@ -21,15 +22,14 @@ condition = {
   :channel_num => 3,
   :height => 224,
   :width => 224,
-  :input_layer => conv1_1_in_name,
-  :output_layers => [fc6_out_name, softmax_out_name]
+  :input_layer => CONV1_1_IN_NAME,
+  :output_layers => [FC6_OUT_NAME, SOFTMAX_OUT_NAME]
 }
 
 # prepare dataset
-imageset = []
-imagelist.each do |image_filepath|
+imageset = imagelist.map do |image_filepath|
   image = Image.read(image_filepath).first
-  imageset << image.resize_to_fill(condition[:width], condition[:height])
+  image.resize_to_fill(condition[:width], condition[:height])
 end
 
 # make model for inference under 'condition'
@@ -41,15 +41,15 @@ inference_results = model.inference(imageset)
 # load category definition
 categories = File.read('../data/synset_words.txt').split("\n")
 
-inference_results.each_with_index do |inference_result, i|
-    puts "=== Result for #{imagelist[i]} ==="
+TOP_K = 5
+inference_results.zip(imagelist).each do |inference_result, image_filepath|
+  puts "=== Result for #{image_filepath} ==="
 
-    # sort by score
-    sorted_result = inference_result[softmax_out_name].zip(categories).sort_by{|x| -x[0]}
+  # sort by score
+  sorted_result = inference_result[SOFTMAX_OUT_NAME].zip(categories).sort_by{|x| -x[0]}
 
-    # display result
-    sorted_result[0,5].each do |result|
-    puts "#{result[1]} : #{result[0]}"
-    end
+  # display result
+  sorted_result[0, TOP_K].each do |score, category|
+  puts "#{category} : #{score}"
+  end
 end
-
