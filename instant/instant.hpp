@@ -101,7 +101,7 @@ namespace instant {
         auto const& variable_memory_table = std::get<1>(temp_tuple);
         auto const& temp_variable_memory_list = std::get<2>(temp_tuple);
         auto const& output_table = std::get<3>(temp_tuple);
-        return new model(onnx_model, parameter_table, temp_array_list,
+        return model(onnx_model, parameter_table, temp_array_list,
                      parameter_memory_table, input_table, input_memory_table,
                      output_table, nets, variable_memory_table,
                      temp_variable_memory_list);

@@ -94,11 +94,11 @@ static VALUE wrap_model_init(VALUE self, VALUE vonnx, VALUE condition) {
 
     std::vector<int> input_dims{batch_size, channel_num, height, width};
 
-    auto model = instant::make_model(
+    instant::model* model = new instant::model(instant::make_model(
       *(getONNX(vonnx)->onnx),
       {std::make_tuple(*input_layer, instant::dtype_t::float_, input_dims,
                        mkldnn::memory::format::nchw)},
-      *output_layers);
+      *output_layers));
     getModel(self)->model = model;
 
     return Qnil;
